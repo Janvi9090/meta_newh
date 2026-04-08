@@ -1,36 +1,49 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from simulation.tasks import get_task
 from simulation.models import Action
-import threading
+import os
 
 app = Flask(__name__)
 
-def choose_action(obs):
-    target = 30
-    error = target - obs.concentration
-    dose = max(0, min(20, error * 0.4))
-    return round(dose, 2)
-
-def run_episode(task_name):
-    env = get_task(task_name)
-    obs = env.reset()
-    results = []
-    done = False
-    while not done:
-        dose = choose_action(obs)
-        action = Action(dose=dose)
-        obs, reward, done, _ = env.step(action)
-        results.append({"dose": dose, "reward": round(reward, 2), "done": done})
-    return results
+# Store active environments
+envs = {}
 
 @app.route("/")
 def index():
     return jsonify({"status": "running", "message": "Medication Dosing Env is live!"})
 
-@app.route("/run/<task_name>")
-def run(task_name):
-    results = run_episode(task_name)
-    return jsonify({"task": task_name, "steps": results})
+@app.route("/reset", methods=["POST"])
+def reset():
+    data = request.get_json() or {}
+    task_name = data.get("task", "easy")
+    env = get_task(task_name)
+    obs = env.reset()
+    envs["current"] = env
+    return jsonify({"observation": {"concentration": obs.concentration}})
+
+@app.route("/step", methods=["POST"])
+def step():
+    data = request.get_json() or {}
+    dose = float(data.get("dose", 0.0))
+    env = envs.get("current")
+    if env is None:
+        return jsonify({"error": "Environment not initialized. Call /reset first."}), 400
+    action = Action(dose=dose)
+    obs, reward, done, info = env.step(action)
+    return jsonify({
+        "observation": {"concentration": obs.concentration},
+        "reward": reward,
+        "done": done,
+        "info": info
+    })
+
+@app.route("/close", methods=["POST"])
+def close():
+    env = envs.get("current")
+    if env:
+        env.close()
+        envs.pop("current", None)
+    return jsonify({"status": "closed"})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=7860)
