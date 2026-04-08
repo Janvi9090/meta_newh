@@ -18,13 +18,26 @@ client = OpenAI(
 
 # Smarter adaptive policy
 def choose_action(obs):
-    target = 30
-    error = target - obs.concentration
+    prompt = f"""You are a medical dosing agent. 
+Current drug concentration: {obs.concentration:.2f}
+Target therapeutic range: 10-50 units
+Target concentration: 30 units
 
-    # Slightly conservative control for noisy system
-    dose = max(0, min(20, error * 0.4))
-    return round(dose, 2)
+Respond with ONLY a single number representing the dose to administer (between 0 and 20).
+No explanation, just the number."""
 
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    
+    try:
+        dose = float(response.choices[0].message.content.strip())
+        return round(max(0, min(20, dose)), 2)
+    except:
+        # fallback to math if LLM fails
+        error = 30 - obs.concentration
+        return round(max(0, min(20, error * 0.4)), 2)
 
 def run_episode(task_name):
     env = get_task(task_name)
@@ -61,6 +74,7 @@ def run_episode(task_name):
         )
 
     finally:
+        env.close()
         success = "true" if raw_rewards and all(r >= -0.2 for r in raw_rewards) else "false"
         print(f"[END] success={success} steps={step} rewards={','.join(rewards)}")
 

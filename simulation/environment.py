@@ -49,3 +49,7 @@ class MedicationEnv:
             done,
             {}
         )
+    
+    def close(self):
+        pass
+
