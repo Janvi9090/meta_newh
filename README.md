@@ -1,4 +1,19 @@
+
+
+---
+title: Medication Dosing Env
+emoji: 💊
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
 # Medication Dosing & Toxicity Control (OpenEnv)
+
+
+
+# Medication Dosing Environment
 
 ## Overview
 This environment simulates drug dosing in a patient where the agent must maintain drug concentration within a therapeutic window.
